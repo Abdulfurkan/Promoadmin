@@ -1,16 +1,32 @@
 import { NextResponse } from 'next/server';
 import { openDb } from '@/lib/db';
 
+// Define interfaces for our types
+interface PromoCode {
+  id: number;
+  code: string;
+  description: string;
+}
+
+// Extend the NodeJS global type
+declare global {
+  // eslint-disable-next-line no-var
+  var __inMemoryPromoCodes: PromoCode[];
+}
+
+// Initialize global variables if they don't exist
+if (!global.__inMemoryPromoCodes) {
+  global.__inMemoryPromoCodes = [];
+}
+
 // In-memory storage for new promo codes when in Vercel environment
-let inMemoryPromoCodes: { id: number; code: string; description: string }[] = [];
+const inMemoryPromoCodes: PromoCode[] = global.__inMemoryPromoCodes;
 let nextId = 1000; // Start with a high ID to avoid conflicts with existing IDs
 
-// Try to get existing in-memory promo codes from global scope
-try {
-  // @ts-expect-error Accessing global variable
-  inMemoryPromoCodes = global.inMemoryPromoCodes || [];
-} catch (error) {
-  console.error('Error accessing global in-memory promo codes:', error);
+// Find the highest ID to ensure we don't reuse IDs
+if (inMemoryPromoCodes.length > 0) {
+  const maxId = Math.max(...inMemoryPromoCodes.map((pc: PromoCode) => pc.id));
+  nextId = Math.max(nextId, maxId + 1);
 }
 
 export async function GET() {
@@ -20,6 +36,7 @@ export async function GET() {
     
     // In Vercel environment, merge database promo codes with in-memory ones
     if (process.env.VERCEL) {
+      console.log('In-memory promo codes count:', inMemoryPromoCodes.length);
       return NextResponse.json({ 
         success: true, 
         promoCodes: [...promoCodes, ...inMemoryPromoCodes] 
@@ -51,7 +68,7 @@ export async function POST(request: Request) {
     // Check if we're in Vercel environment
     if (process.env.VERCEL) {
       // Check if code already exists in memory
-      if (inMemoryPromoCodes.some(pc => pc.code === code)) {
+      if (inMemoryPromoCodes.some((pc: PromoCode) => pc.code === code)) {
         return NextResponse.json(
           { success: false, message: 'Promo code already exists' },
           { status: 409 }
@@ -69,16 +86,9 @@ export async function POST(request: Request) {
       }
       
       // Add to in-memory storage
-      const newPromoCode = { id: nextId++, code, description };
+      const newPromoCode: PromoCode = { id: nextId++, code, description };
       inMemoryPromoCodes.push(newPromoCode);
-      
-      // Store in global scope for access across serverless function invocations
-      try {
-        // @ts-expect-error Accessing global variable
-        global.inMemoryPromoCodes = inMemoryPromoCodes;
-      } catch (error) {
-        console.error('Error storing global in-memory promo codes:', error);
-      }
+      console.log('Added in-memory promo code:', newPromoCode);
       
       return NextResponse.json({ 
         success: true, 
@@ -139,18 +149,11 @@ export async function DELETE(request: Request) {
     // Check if we're in Vercel environment
     if (process.env.VERCEL) {
       // Check if it's an in-memory promo code
-      const inMemoryIndex = inMemoryPromoCodes.findIndex(pc => pc.id === idNum);
+      const inMemoryIndex = inMemoryPromoCodes.findIndex((pc: PromoCode) => pc.id === idNum);
       if (inMemoryIndex !== -1) {
         // Remove from in-memory storage
         inMemoryPromoCodes.splice(inMemoryIndex, 1);
-        
-        // Update global scope
-        try {
-          // @ts-expect-error Accessing global variable
-          global.inMemoryPromoCodes = inMemoryPromoCodes;
-        } catch (error) {
-          console.error('Error updating global in-memory promo codes:', error);
-        }
+        console.log('Deleted in-memory promo code with ID:', idNum);
         
         return NextResponse.json({ 
           success: true, 
@@ -170,16 +173,20 @@ export async function DELETE(request: Request) {
       
       // For database promo codes in Vercel, we'll "hide" them by adding them to a "deleted" list
       // This is a workaround since we can't actually delete from the database in Vercel
-      inMemoryPromoCodes = inMemoryPromoCodes.filter(pc => pc.id !== -idNum);
-      inMemoryPromoCodes.push({ id: -idNum, code: `DELETED_${promoCode.code}`, description: `DELETED: ${promoCode.description}` });
+      const deletedPromoCode: PromoCode = { 
+        id: -idNum, 
+        code: `DELETED_${promoCode.code}`, 
+        description: `DELETED: ${promoCode.description}` 
+      };
       
-      // Update global scope
-      try {
-        // @ts-expect-error Accessing global variable
-        global.inMemoryPromoCodes = inMemoryPromoCodes;
-      } catch (error) {
-        console.error('Error updating global in-memory promo codes:', error);
+      // Remove any existing deleted entry for this ID
+      const existingIndex = inMemoryPromoCodes.findIndex((pc: PromoCode) => pc.id === -idNum);
+      if (existingIndex !== -1) {
+        inMemoryPromoCodes.splice(existingIndex, 1);
       }
+      
+      inMemoryPromoCodes.push(deletedPromoCode);
+      console.log('Marked database promo code as deleted:', deletedPromoCode);
       
       return NextResponse.json({ 
         success: true, 
