@@ -5,6 +5,14 @@ import { openDb } from '@/lib/db';
 let inMemoryPromoCodes: { id: number; code: string; description: string }[] = [];
 let nextId = 1000; // Start with a high ID to avoid conflicts with existing IDs
 
+// Try to get existing in-memory promo codes from global scope
+try {
+  // @ts-expect-error Accessing global variable
+  inMemoryPromoCodes = global.inMemoryPromoCodes || [];
+} catch (error) {
+  console.error('Error accessing global in-memory promo codes:', error);
+}
+
 export async function GET() {
   try {
     const db = await openDb();
@@ -63,6 +71,14 @@ export async function POST(request: Request) {
       // Add to in-memory storage
       const newPromoCode = { id: nextId++, code, description };
       inMemoryPromoCodes.push(newPromoCode);
+      
+      // Store in global scope for access across serverless function invocations
+      try {
+        // @ts-expect-error Accessing global variable
+        global.inMemoryPromoCodes = inMemoryPromoCodes;
+      } catch (error) {
+        console.error('Error storing global in-memory promo codes:', error);
+      }
       
       return NextResponse.json({ 
         success: true, 
@@ -127,6 +143,15 @@ export async function DELETE(request: Request) {
       if (inMemoryIndex !== -1) {
         // Remove from in-memory storage
         inMemoryPromoCodes.splice(inMemoryIndex, 1);
+        
+        // Update global scope
+        try {
+          // @ts-expect-error Accessing global variable
+          global.inMemoryPromoCodes = inMemoryPromoCodes;
+        } catch (error) {
+          console.error('Error updating global in-memory promo codes:', error);
+        }
+        
         return NextResponse.json({ 
           success: true, 
           message: 'Promo code deleted successfully' 
@@ -147,6 +172,14 @@ export async function DELETE(request: Request) {
       // This is a workaround since we can't actually delete from the database in Vercel
       inMemoryPromoCodes = inMemoryPromoCodes.filter(pc => pc.id !== -idNum);
       inMemoryPromoCodes.push({ id: -idNum, code: `DELETED_${promoCode.code}`, description: `DELETED: ${promoCode.description}` });
+      
+      // Update global scope
+      try {
+        // @ts-expect-error Accessing global variable
+        global.inMemoryPromoCodes = inMemoryPromoCodes;
+      } catch (error) {
+        console.error('Error updating global in-memory promo codes:', error);
+      }
       
       return NextResponse.json({ 
         success: true, 
