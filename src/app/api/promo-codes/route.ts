@@ -30,23 +30,22 @@ export async function POST(request: Request) {
     const db = await openDb();
     
     // Check if code already exists
-    const existingCode = await db.get('SELECT * FROM promo_codes WHERE code = ?', code);
+    const existingCode = await db.get('SELECT * FROM promo_codes WHERE code = ?', [code]);
     if (existingCode) {
       return NextResponse.json(
         { success: false, message: 'Promo code already exists' },
-        { status: 400 }
+        { status: 409 }
       );
     }
     
     // Insert new promo code
     await db.run(
       'INSERT INTO promo_codes (code, description) VALUES (?, ?)',
-      code,
-      description
+      [code, description]
     );
     
-    // Return the newly created promo code
-    const newPromoCode = await db.get('SELECT * FROM promo_codes WHERE code = ?', code);
+    // Get the newly created promo code
+    const newPromoCode = await db.get('SELECT * FROM promo_codes WHERE code = ?', [code]);
     
     return NextResponse.json({ 
       success: true, 
@@ -77,7 +76,7 @@ export async function DELETE(request: Request) {
     const db = await openDb();
     
     // Check if promo code exists
-    const promoCode = await db.get('SELECT * FROM promo_codes WHERE id = ?', id);
+    const promoCode = await db.get('SELECT * FROM promo_codes WHERE id = ?', [id]);
     if (!promoCode) {
       return NextResponse.json(
         { success: false, message: 'Promo code not found' },
@@ -86,7 +85,7 @@ export async function DELETE(request: Request) {
     }
     
     // Delete the promo code
-    await db.run('DELETE FROM promo_codes WHERE id = ?', id);
+    await db.run('DELETE FROM promo_codes WHERE id = ?', [id]);
     
     return NextResponse.json({ 
       success: true, 
