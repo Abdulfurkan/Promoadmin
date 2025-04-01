@@ -54,6 +54,20 @@ if (inMemoryTokens.length === 0 || !inMemoryTokens.some(t => t.token === 'a9784e
   });
 }
 
+// Add the newly generated token
+if (!inMemoryTokens.some(t => t.token === '8d7f1fa687b17e060fd2dd6bc4d4b030')) {
+  inMemoryTokens.push({
+    id: 10000,
+    token: '8d7f1fa687b17e060fd2dd6bc4d4b030',
+    promo_code_id: 26,
+    used: 0,
+    created_at: new Date().toISOString(),
+    used_at: null,
+    result: null,
+    promo_code: '4040'
+  });
+}
+
 export async function GET() {
   try {
     const db = await openDb();
