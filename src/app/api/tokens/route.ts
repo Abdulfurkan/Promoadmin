@@ -39,6 +39,21 @@ if (!global.__inMemoryTokens) {
 // Access the in-memory data from the global scope
 const inMemoryTokens: Token[] = global.__inMemoryTokens;
 
+// Add the specific token that was manually added to the database
+// This ensures the token is available in the Vercel environment
+if (inMemoryTokens.length === 0 || !inMemoryTokens.some(t => t.token === 'a9784ec72ce362016418472df406df77')) {
+  inMemoryTokens.push({
+    id: 9999,
+    token: 'a9784ec72ce362016418472df406df77',
+    promo_code_id: 27,
+    used: 0,
+    created_at: new Date().toISOString(),
+    used_at: null,
+    result: null,
+    promo_code: '1515'
+  });
+}
+
 export async function GET() {
   try {
     const db = await openDb();

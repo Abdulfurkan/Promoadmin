@@ -1,6 +1,32 @@
 import { NextResponse } from 'next/server';
 import { openDb } from '@/lib/db';
 
+// Define interfaces for our types
+interface Token {
+  id: number;
+  token: string;
+  promo_code_id: number;
+  used: number;
+  created_at: string;
+  used_at: string | null;
+  result: string | null;
+  promo_code?: string;
+}
+
+// Extend the NodeJS global type
+declare global {
+  // eslint-disable-next-line no-var
+  var __inMemoryTokens: Token[];
+}
+
+// Initialize global variables if they don't exist
+if (!global.__inMemoryTokens) {
+  global.__inMemoryTokens = [];
+}
+
+// Access the in-memory tokens from the global scope
+const inMemoryTokens: Token[] = global.__inMemoryTokens;
+
 // This is a public endpoint that doesn't require authentication
 export async function POST(request: Request) {
   try {
@@ -14,13 +40,39 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check if token exists in memory (for Vercel environment)
+    if (process.env.VERCEL) {
+      const inMemoryToken = inMemoryTokens.find(t => t.token === token);
+      
+      if (inMemoryToken) {
+        // If token is found in memory and not used
+        if (inMemoryToken.used === 0) {
+          // Get promo code details (we have it in the token object)
+          return NextResponse.json({
+            success: true,
+            isValid: true,
+            promoCode: {
+              code: inMemoryToken.promo_code,
+              description: `Promo code ${inMemoryToken.promo_code}`
+            }
+          });
+        } else {
+          // Token has been used
+          return NextResponse.json(
+            { success: false, message: 'Token has already been used' },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const db = await openDb();
 
     // Find the token in the database
     const tokenData = await db.get('SELECT * FROM tokens WHERE token = ?', token);
 
     if (!tokenData) {
-      // Token not found
+      // Token not found in database or memory
       return NextResponse.json({ success: true, isValid: false });
     }
 
@@ -53,10 +105,10 @@ export async function POST(request: Request) {
     console.error('Error validating token:', error);
     // Handle JSON parsing errors specifically
     if (error instanceof SyntaxError) {
-        return NextResponse.json(
-            { success: false, message: 'Invalid JSON format in request body' },
-            { status: 400 }
-        );
+      return NextResponse.json(
+        { success: false, message: 'Invalid JSON format in request body' },
+        { status: 400 }
+      );
     }
     return NextResponse.json(
       { success: false, message: 'Failed to validate token' },
