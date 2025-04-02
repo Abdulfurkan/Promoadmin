@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { openDb, isServerless, inMemoryPromoCodes, PromoCode } from '@/lib/db';
+import { openDb, isServerless, inMemoryPromoCodes, PromoCode, initDb } from '@/lib/db';
 
 let nextId = 1000; // Start with a high ID for in-memory promo codes
+let dbInitialized = false;
 
 // Find the highest ID to ensure we don't reuse IDs
 if (inMemoryPromoCodes.length > 0) {
@@ -9,8 +10,24 @@ if (inMemoryPromoCodes.length > 0) {
   nextId = Math.max(nextId, maxId + 1);
 }
 
+// Ensure database is initialized
+async function ensureDbInitialized() {
+  if (!dbInitialized) {
+    console.log('Initializing database from API route');
+    try {
+      await initDb();
+      dbInitialized = true;
+    } catch (error) {
+      console.error('Failed to initialize database:', error);
+    }
+  }
+}
+
 export async function GET() {
   try {
+    // Make sure DB is initialized first
+    await ensureDbInitialized();
+    
     console.log('GET promo codes, serverless mode:', isServerless);
     
     if (isServerless) {
@@ -22,6 +39,7 @@ export async function GET() {
     // In local environment, use SQLite
     const db = await openDb();
     const promoCodes = await db.all('SELECT * FROM promo_codes ORDER BY code');
+    console.log(`Retrieved ${promoCodes.length} promo codes from database`);
     
     return NextResponse.json({ success: true, promoCodes });
   } catch (error) {
@@ -35,6 +53,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    // Make sure DB is initialized first
+    await ensureDbInitialized();
+    
     const { code, description } = await request.json();
     
     // Validate input
@@ -69,6 +90,7 @@ export async function POST(request: Request) {
       
       inMemoryPromoCodes.push(newPromoCode);
       console.log('Added in-memory promo code:', newPromoCode);
+      console.log(`Total in-memory promo codes: ${inMemoryPromoCodes.length}`);
       
       return NextResponse.json({ 
         success: true, 
@@ -142,6 +164,9 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    // Make sure DB is initialized first
+    await ensureDbInitialized();
+    
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     

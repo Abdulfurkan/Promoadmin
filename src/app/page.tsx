@@ -57,19 +57,35 @@ export default function Home() {
   async function fetchData() {
     try {
       setLoading(true);
+      console.log('Fetching data...');
+      
       const [promoCodesResponse, tokensResponse] = await Promise.all([
         fetch('/api/promo-codes'),
         fetch('/api/tokens')
       ]);
       
+      console.log('Promo codes response status:', promoCodesResponse.status);
+      
       if (promoCodesResponse.ok && tokensResponse.ok) {
         const promoCodesData = await promoCodesResponse.json();
         const tokensData = await tokensResponse.json();
         
+        console.log('Promo codes data:', promoCodesData);
+        console.log(`Received ${promoCodesData.promoCodes?.length || 0} promo codes`);
+        
         setPromoCodes(promoCodesData.promoCodes || []);
         setTokens(tokensData.tokens || []);
       } else {
-        console.error('Failed to fetch data');
+        console.error('Failed to fetch data', { 
+          promoCodesStatus: promoCodesResponse.status,
+          tokensStatus: tokensResponse.status 
+        });
+        
+        // Try to get error details
+        if (!promoCodesResponse.ok) {
+          const errorData = await promoCodesResponse.text();
+          console.error('Promo codes error:', errorData);
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);

@@ -40,8 +40,8 @@ const DB_PATH = path.join(DATA_DIR, 'tokens.db');
 console.log(`Database path: ${DB_PATH}`);
 
 // Check if we're in a serverless environment (Vercel)
-export const isServerless = process.env.VERCEL === '1';
-console.log(`Running in serverless environment: ${isServerless}`);
+export const isServerless = process.env.VERCEL !== undefined;
+console.log(`Running in serverless environment: ${isServerless}, VERCEL env: ${process.env.VERCEL}`);
 
 // Initialize database connection
 export async function openDb() {
