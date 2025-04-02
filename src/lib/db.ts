@@ -1,11 +1,18 @@
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
 import path from 'path';
+import fs from 'fs';
+
+// Ensure the data directory exists
+const DATA_DIR = path.join(process.cwd(), 'data');
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 // Initialize database connection
 export async function openDb() {
   return open({
-    filename: path.join(process.cwd(), 'tokens.db'),
+    filename: path.join(DATA_DIR, 'tokens.db'),
     driver: sqlite3.Database
   });
 }
