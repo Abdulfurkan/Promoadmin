@@ -35,11 +35,15 @@ export async function POST(request: Request) {
       );
     }
     
+    // Log the input for debugging
+    console.log('Creating promo code:', { code, description });
+    
     const db = await openDb();
     
     // Check if code already exists
     const existingCode = await db.get('SELECT * FROM promo_codes WHERE code = ?', [code]);
     if (existingCode) {
+      console.log('Promo code already exists:', code);
       return NextResponse.json(
         { success: false, message: 'Promo code already exists' },
         { status: 409 }
@@ -47,13 +51,40 @@ export async function POST(request: Request) {
     }
     
     // Insert new promo code
-    await db.run(
-      'INSERT INTO promo_codes (code, description) VALUES (?, ?)',
-      [code, description]
-    );
+    try {
+      await db.run(
+        'INSERT INTO promo_codes (code, description) VALUES (?, ?)',
+        [code, description]
+      );
+      console.log('Successfully inserted promo code into database');
+    } catch (dbError) {
+      console.error('Database error during insertion:', dbError);
+      return NextResponse.json(
+        { success: false, message: 'Database error during promo code creation', error: String(dbError) },
+        { status: 500 }
+      );
+    }
     
     // Get the newly created promo code
-    const newPromoCode = await db.get('SELECT * FROM promo_codes WHERE code = ?', [code]) as PromoCode;
+    let newPromoCode;
+    try {
+      newPromoCode = await db.get('SELECT * FROM promo_codes WHERE code = ?', [code]) as PromoCode;
+      console.log('Retrieved new promo code:', newPromoCode);
+      
+      if (!newPromoCode) {
+        console.error('Promo code was not found after insertion');
+        return NextResponse.json(
+          { success: false, message: 'Promo code was created but could not be retrieved' },
+          { status: 500 }
+        );
+      }
+    } catch (retrieveError) {
+      console.error('Error retrieving newly created promo code:', retrieveError);
+      return NextResponse.json(
+        { success: false, message: 'Error retrieving newly created promo code', error: String(retrieveError) },
+        { status: 500 }
+      );
+    }
     
     return NextResponse.json({ 
       success: true, 
@@ -63,7 +94,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error creating promo code:', error);
     return NextResponse.json(
-      { success: false, message: 'Failed to create promo code' },
+      { success: false, message: 'Failed to create promo code', error: String(error) },
       { status: 500 }
     );
   }
